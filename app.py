@@ -36,6 +36,7 @@ DB_CONFIG = {
     'database': os.environ.get('DB_NAME', 'mineiro')
 }
 
+
 GRUPOS_FIXOS = {
     'A': ['URT', 'Democrata GV', 'Atlético MG', 'Uberlândia'],
     'B': ['América MG', 'Pouso Alegre', 'Betim', 'Tombense'],
@@ -43,6 +44,7 @@ GRUPOS_FIXOS = {
 }
 
 def get_db_connection():
+    print(**DB_CONFIG)
     return mysql.connector.connect(**DB_CONFIG)
 
 def carregar_mapa_logos():
