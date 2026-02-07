@@ -7,6 +7,7 @@ import copy
 from flask_login import LoginManager, current_user, login_required
 # Importa o Blueprint e a função load_user do login.py
 from login import auth_bp, load_user as auth_load_user
+import os
 
 app = Flask(__name__)
 app.secret_key = 'diego2810'
@@ -22,14 +23,15 @@ def loader(user_id):
     return auth_load_user(user_id)
 # ---------------------------
 
-app.register_blueprint(auth_bp)
+app.secret_key = os.environ.get('SECRET_KEY', 'diego2810')
 
+# substituir DB_CONFIG fixo por leitura de variáveis de ambiente
 DB_CONFIG = {
-    'host': 'localhost',
-    'port': 3306,
-    'user': 'root',
-    'password': '1234',
-    'database': 'mineiro'
+    'host': os.environ.get('DB_HOST', 'localhost'),
+    'port': int(os.environ.get('DB_PORT', 3306)),
+    'user': os.environ.get('DB_USER', 'root'),
+    'password': os.environ.get('DB_PASS', '1234'),
+    'database': os.environ.get('DB_NAME', 'mineiro')
 }
 
 GRUPOS_FIXOS = {
@@ -289,4 +291,7 @@ def api_atualizar():
     })
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    host = os.environ.get('HOST', '0.0.0.0')
+    port = int(os.environ.get('PORT', 8080))
+    debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
+    app.run(host=host, port=port, debug=debug)
