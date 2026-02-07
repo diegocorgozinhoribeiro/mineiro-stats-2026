@@ -1,0 +1,1 @@
+# mineiro-stats-2026
