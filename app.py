@@ -44,7 +44,7 @@ GRUPOS_FIXOS = {
 }
 
 def get_db_connection():
-    print(**DB_CONFIG)
+    print(DB_CONFIG)
     return mysql.connector.connect(**DB_CONFIG)
 
 def carregar_mapa_logos():
