@@ -2,15 +2,16 @@ import mysql.connector
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_user, logout_user, login_required, UserMixin, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
+import os
 
 auth_bp = Blueprint('auth', __name__)
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'port': 3306,
-    'user': 'root',
-    'password': '1234',
-    'database': 'mineiro'
+    'host': os.environ.get('DB_HOST', 'localhost'),
+    'port': int(os.environ.get('DB_PORT', 3306)),
+    'user': os.environ.get('DB_USER', 'root'),
+    'password': os.environ.get('DB_PASS', '1234'),
+    'database': os.environ.get('DB_NAME', 'mineiro')
 }
 
 def get_db_connection():
