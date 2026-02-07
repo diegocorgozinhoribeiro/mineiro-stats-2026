@@ -8,6 +8,7 @@ from flask_login import LoginManager, current_user, login_required
 # Importa o Blueprint e a função load_user do login.py
 from login import auth_bp, load_user as auth_load_user
 import os
+import gunicorn
 
 app = Flask(__name__)
 app.secret_key = 'diego2810'
