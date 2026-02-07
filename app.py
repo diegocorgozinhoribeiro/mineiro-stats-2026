@@ -11,7 +11,7 @@ import os
 
 app = Flask(__name__)
 app.secret_key = 'diego2810'
-
+app.register_blueprint(auth_bp)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'auth.login' # Se tentar entrar na home sem logar, vai pra cá
@@ -21,6 +21,7 @@ login_manager.login_view = 'auth.login' # Se tentar entrar na home sem logar, va
 @login_manager.user_loader
 def loader(user_id):
     return auth_load_user(user_id)
+
 # ---------------------------
 
 app.secret_key = os.environ.get('SECRET_KEY', 'diego2810')
