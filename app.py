@@ -43,6 +43,14 @@ GRUPOS_FIXOS = {
     'C': ['North', 'Cruzeiro', 'Athletic', 'Itabirito']
 }
 
+# --- CACHE EM MEMÓRIA ---
+# Variável global para armazenar os dados e evitar consultas repetidas
+CACHE_APP = {
+    'jogos': None,
+    'logos': None
+}
+# ------------------------
+
 def get_db_connection():
     return mysql.connector.connect(**DB_CONFIG)
 
@@ -70,6 +78,19 @@ def buscar_dados_brutos():
     conn.close()
     return jogos
 
+def obter_dados_memoria():
+    """
+    Retorna os dados dos jogos e logos.
+    Se já estiverem na memória (CACHE_APP), retorna de lá.
+    Caso contrário, busca no banco de dados e salva na memória.
+    """
+    if CACHE_APP['jogos'] is None or CACHE_APP['logos'] is None:
+        print("--- CARREGANDO DADOS DO BANCO PARA A MEMÓRIA (CACHE) ---")
+        CACHE_APP['jogos'] = buscar_dados_brutos()
+        CACHE_APP['logos'] = carregar_mapa_logos()
+
+    return CACHE_APP['jogos'], CACHE_APP['logos']
+
 def processar_tabela_base(jogos, simulacoes_usuario=None, mapa_logos=None):
     if mapa_logos is None: mapa_logos = {}
     if simulacoes_usuario is None: simulacoes_usuario = {}
@@ -89,6 +110,7 @@ def processar_tabela_base(jogos, simulacoes_usuario=None, mapa_logos=None):
     for jogo in jogos:
         mid = str(jogo['match_id'])
         r = jogo['rodada']
+        # Copia o objeto para não alterar o cache original durante a simulação
         j = jogo.copy()
 
         tc_raw = j['time_casa'].strip()
@@ -246,10 +268,10 @@ def calcular_probabilidade_exata(tabela_base, jogos_abertos):
     return resultado_final
 
 @app.route('/')
-@login_required # <--- ISSO TRANCA A PÁGINA
+@login_required
 def index():
-    raw_games = buscar_dados_brutos()
-    logos = carregar_mapa_logos()
+    # USANDO O CACHE EM VEZ DE BUSCAR DO BANCO
+    raw_games, logos = obter_dados_memoria()
 
     tabela_calc, rodadas_dict, jogos_abertos = processar_tabela_base(raw_games, {}, logos)
     classificacao_geral, grupos = ordenar_ranking_final(tabela_calc)
@@ -271,14 +293,16 @@ def index():
                            user=current_user)
 
 @app.route('/api/atualizar_tabela', methods=['POST'])
-@login_required # Opcional: proteger a API também
+@login_required
 def api_atualizar():
     data = request.json
     sims_user = data.get('simulacoes', {})
     calcular_agora = data.get('calcular_probabilidade', False)
 
-    raw_games = buscar_dados_brutos()
-    logos = carregar_mapa_logos()
+    # USANDO O CACHE EM VEZ DE BUSCAR DO BANCO
+    # Os cálculos (soma de pontos, gols) são feitos em memória pelo processar_tabela_base
+    # usando os dados crus (raw_games) + as simulações do usuário
+    raw_games, logos = obter_dados_memoria()
 
     tabela_calc, _, jogos_abertos = processar_tabela_base(raw_games, sims_user, logos)
     classificacao_geral, grupos = ordenar_ranking_final(tabela_calc)
@@ -298,4 +322,11 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     print(port)
     debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
+    # Pré-carregar na inicialização do servidor (opcional, mas recomendado)
+    with app.app_context():
+        try:
+            obter_dados_memoria()
+        except:
+            print("Não foi possível carregar cache inicial (banco pode estar offline)")
+
     app.run(host=host, port=port, debug=debug)

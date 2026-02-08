@@ -90,8 +90,13 @@ def register():
                 senha_hash = generate_password_hash(password)
                 cursor.execute("INSERT INTO users (username, password_hash) VALUES (%s, %s)", (username, senha_hash))
                 conn.commit()
-                flash('Conta criada com sucesso! Faça login.', 'success')
-                return redirect(url_for('auth.login'))
+
+                # Loga o usuário automaticamente
+                user = User(id=username, username=username)
+                login_user(user)
+
+                flash('Conta criada com sucesso!', 'success')
+                return redirect(url_for('index'))
         except mysql.connector.Error as err:
             flash(f'Erro no banco de dados: {err}', 'danger')
         finally:
