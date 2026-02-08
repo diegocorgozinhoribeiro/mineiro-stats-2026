@@ -9,11 +9,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-# Ajuste de importação para versões mais recentes do webdriver_manager
+# Importando do novo arquivo centralizador
+from database import get_sqlalchemy_conn_string
+
 try:
     from webdriver_manager.core.os_manager import ChromeType
 except ImportError:
-    # Fallback genérico ou para versões onde utils existia (raro hoje em dia, mas mantém compatibilidade)
     ChromeType = None
 
 def executar_atualizacao():
@@ -25,27 +26,25 @@ def executar_atualizacao():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
-    # Importante: Simular um navegador real para evitar bloqueios
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
 
-    # Define explicitamente o caminho do binário (específico para o ambiente do seu servidor)
-    options.binary_location = "/usr/bin/chromium"
+    # Ajuste este caminho se necessário
+    if os.path.exists("/usr/bin/chromium"):
+        options.binary_location = "/usr/bin/chromium"
 
     driver = None
     try:
         print("Configurando driver...")
-        # Tenta usar ChromeType se a importação funcionou, senão vai no padrão
         if ChromeType and hasattr(ChromeType, 'CHROMIUM'):
             manager = ChromeDriverManager(chrome_type=ChromeType.CHROMIUM)
         else:
-            manager = ChromeDriverManager() # Tenta detectar automático ou padrão
+            manager = ChromeDriverManager()
 
         service = Service(manager.install())
         driver = webdriver.Chrome(service=service, options=options)
     except Exception as e:
         print(f"Erro na configuração automática: {e}")
         try:
-            print("Tentando inicialização direta com Selenium Manager...")
             driver = webdriver.Chrome(options=options)
         except Exception as e2:
             print(f"Falha crítica ao iniciar driver: {e2}")
@@ -57,16 +56,12 @@ def executar_atualizacao():
         print("Acessando URL...")
         driver.get(url)
 
-        # Espera explícita pelo carregamento da tabela (até 20 segundos)
         print("Aguardando carregamento da tabela...")
-        wait = WebDriverWait(driver, 20)
+        wait = WebDriverWait(driver, 25)
         tabela = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "Opta-Crested")))
-
-        # Pequena pausa extra para garantir que o conteúdo dentro da tabela renderizou
         time.sleep(3)
 
         segmentos = tabela.find_elements(By.TAG_NAME, "tbody")
-
         dados_lista = []
         print(f"Encontrados {len(segmentos)} segmentos de tabela. Processando...")
 
@@ -77,15 +72,12 @@ def executar_atualizacao():
                 try:
                     nome_casa = segmento.find_element(By.CLASS_NAME, "Opta-Home.Opta-TeamName").text
                     nome_fora = segmento.find_element(By.CLASS_NAME, "Opta-Away.Opta-TeamName").text
-
                     match_id = nome_casa + nome_fora
 
-                    # Tenta extrair o placar com tratamento de erro caso o jogo não tenha ocorrido
                     try:
                         gols_casa = int(segmento.find_element(By.CSS_SELECTOR, "td.Opta-Home.Opta-Score span").text)
                         gols_fora = int(segmento.find_element(By.CSS_SELECTOR, "td.Opta-Away.Opta-Score span").text)
                     except:
-                        # Se der erro ao converter int, provavelmente o jogo não começou ou é '-'
                         continue
 
                     row = {
@@ -96,25 +88,17 @@ def executar_atualizacao():
                         "gols_fora": gols_fora,
                     }
                     dados_lista.append(row)
-                except Exception as e:
-                    # Logs detalhados apenas se precisar debug
-                    # print(f"Pular linha: {e}")
+                except:
                     continue
 
         df = pd.DataFrame(dados_lista)
 
         if not df.empty:
-            db_user = os.environ.get('DB_USER', 'root')
-            db_pass = os.environ.get('DB_PASS', '1234')
-            db_host = os.environ.get('DB_HOST', 'localhost')
-            db_port = os.environ.get('DB_PORT', '3306')
-            db_name = os.environ.get('DB_NAME', 'mineiro')
-
-            connection_string = f"mysql+pymysql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+            # USANDO A FUNÇÃO CENTRALIZADA
+            connection_string = get_sqlalchemy_conn_string()
             engine = create_engine(connection_string)
 
             print("Atualizando banco de dados...")
-
             df.to_sql('staged_resultados', con=engine, if_exists='replace', index=False)
 
             query = text("""
@@ -134,22 +118,14 @@ def executar_atualizacao():
                 conn.execute(query)
                 conn.execute(text("DROP TABLE staged_resultados;"))
 
-            print(f"Sucesso! {len(df)} jogos processados e atualizados.")
+            print(f"Sucesso! {len(df)} jogos processados.")
         else:
-            print("Nenhum dado válido encontrado após scraping (DataFrame vazio).")
+            print("Nenhum dado válido encontrado.")
 
     except Exception as e:
-        print(f"Erro durante a execução do scraping: {e}")
-        # Tira um print da tela para debug se der erro (opcional, só salva localmente)
-        try:
-            driver.save_screenshot("erro_scraping.png")
-            print("Screenshot de erro salvo como erro_scraping.png")
-        except:
-            pass
-
+        print(f"Erro durante scraping: {e}")
     finally:
-        if driver:
-            driver.quit()
+        if driver: driver.quit()
         print("--- FIM DO SCRAPING ---")
 
 if __name__ == "__main__":

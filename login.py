@@ -1,21 +1,12 @@
-import mysql.connector
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_user, logout_user, login_required, UserMixin, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
+import mysql.connector
 import os
+# Importando do novo arquivo centralizador
+from database import get_db_connection
 
 auth_bp = Blueprint('auth', __name__)
-
-DB_CONFIG = {
-    'host': os.environ.get('DB_HOST', 'localhost'),
-    'port': int(os.environ.get('DB_PORT', 3306)),
-    'user': os.environ.get('DB_USER', 'root'),
-    'password': os.environ.get('DB_PASS', '1234'),
-    'database': os.environ.get('DB_NAME', 'mineiro')
-}
-
-def get_db_connection():
-    return mysql.connector.connect(**DB_CONFIG)
 
 class User(UserMixin):
     def __init__(self, id, username):
@@ -55,7 +46,6 @@ def login():
         if user_data and check_password_hash(user_data['password_hash'], password):
             user = User(id=user_data['username'], username=user_data['username'])
             login_user(user)
-            # flash('Login realizado com sucesso!', 'success')
             next_page = request.args.get('next')
             return redirect(next_page or url_for('index'))
         else:
@@ -72,7 +62,6 @@ def register():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        # Validação simples
         if not username or not password:
             flash('Preencha todos os campos.', 'warning')
             return render_template('register.html')
@@ -81,17 +70,14 @@ def register():
         cursor = conn.cursor(dictionary=True)
 
         try:
-            # Verifica se usuário já existe
             cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
             if cursor.fetchone():
                 flash('Este nome de usuário já está em uso.', 'danger')
             else:
-                # Criptografa a senha e salva
                 senha_hash = generate_password_hash(password)
                 cursor.execute("INSERT INTO users (username, password_hash) VALUES (%s, %s)", (username, senha_hash))
                 conn.commit()
 
-                # Loga o usuário automaticamente
                 user = User(id=username, username=username)
                 login_user(user)
 
