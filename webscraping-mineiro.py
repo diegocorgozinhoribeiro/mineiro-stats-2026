@@ -1,6 +1,5 @@
 import time
 import os
-from operator import concat
 import pandas as pd
 from sqlalchemy import create_engine, text
 from selenium import webdriver
@@ -9,99 +8,100 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 
-# --- CONFIGURAÇÃO PARA RODAR EM SERVIDOR (HEADLESS) ---
-options = Options()
-options.add_argument("--headless") # Essencial: Roda sem abrir janela
-options.add_argument("--no-sandbox") # Essencial para Linux/Docker
-options.add_argument("--disable-dev-shm-usage") # Evita crash de memória em containers
-options.add_argument("--disable-gpu")
-options.add_argument("--window-size=1920,1080")
+def executar_atualizacao():
+    print("--- INICIANDO PROCESSO DE SCRAPING AUTOMÁTICO ---")
 
-# Tenta instalar o driver automaticamente
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=options)
+    # --- CONFIGURAÇÃO PARA RODAR EM SERVIDOR (HEADLESS) ---
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
 
-url = "https://optaplayerstats.statsperform.com/en_GB/soccer/mineiro-1-2026/5sgngcwblcoi5lqglrkr3q42c/opta-player-stats"
+    # Tenta instalar o driver automaticamente
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=options)
 
-try:
-    print("Iniciando scraping...")
-    driver.get(url)
-    time.sleep(5) # Aguarda carregamento do JS
+    url = "https://optaplayerstats.statsperform.com/en_GB/soccer/mineiro-1-2026/5sgngcwblcoi5lqglrkr3q42c/opta-player-stats"
 
-    tabela = driver.find_element(By.CLASS_NAME, "Opta-Crested")
-    segmentos = tabela.find_elements(By.TAG_NAME, "tbody")
+    try:
+        print("Acessando URL...")
+        driver.get(url)
+        time.sleep(5)  # Aguarda carregamento do JS
 
-    dados_lista = []
+        tabela = driver.find_element(By.CLASS_NAME, "Opta-Crested")
+        segmentos = tabela.find_elements(By.TAG_NAME, "tbody")
 
-    for segmento in segmentos:
-        classes = segmento.get_attribute("class")
+        dados_lista = []
 
-        if "Opta-fixture" in classes:
-            try:
-                # Extração dos campos
-                nome_casa = segmento.find_element(By.CLASS_NAME, "Opta-Home.Opta-TeamName").text
-                nome_fora = segmento.find_element(By.CLASS_NAME, "Opta-Away.Opta-TeamName").text
+        for segmento in segmentos:
+            classes = segmento.get_attribute("class")
 
-                # Match ID consistente
-                match_id = nome_casa + nome_fora
+            if "Opta-fixture" in classes:
+                try:
+                    nome_casa = segmento.find_element(By.CLASS_NAME, "Opta-Home.Opta-TeamName").text
+                    nome_fora = segmento.find_element(By.CLASS_NAME, "Opta-Away.Opta-TeamName").text
 
-                row = {
-                    "match_id": match_id,
-                    "time_casa": nome_casa,
-                    "gols_casa": int(segmento.find_element(By.CSS_SELECTOR, "td.Opta-Home.Opta-Score span").text),
-                    "time_fora": nome_fora,
-                    "gols_fora": int(segmento.find_element(By.CSS_SELECTOR, "td.Opta-Away.Opta-Score span").text),
-                }
-                dados_lista.append(row)
-            except Exception as e:
-                # print(f"Erro ao ler linha: {e}")
-                continue
+                    # Match ID consistente
+                    match_id = nome_casa + nome_fora
 
-    # Transforma em DataFrame
-    df = pd.DataFrame(dados_lista)
-    print(df)
+                    row = {
+                        "match_id": match_id,
+                        "time_casa": nome_casa,
+                        "gols_casa": int(segmento.find_element(By.CSS_SELECTOR, "td.Opta-Home.Opta-Score span").text),
+                        "time_fora": nome_fora,
+                        "gols_fora": int(segmento.find_element(By.CSS_SELECTOR, "td.Opta-Away.Opta-Score span").text),
+                    }
+                    dados_lista.append(row)
+                except Exception as e:
+                    continue
 
-    if not df.empty:
-        # --- CONFIGURAÇÃO DE BANCO VIA VARIÁVEIS DE AMBIENTE ---
-        db_user = os.environ.get('DB_USER', 'root')
-        db_pass = os.environ.get('DB_PASS', '1234')
-        db_host = os.environ.get('DB_HOST', 'localhost') # Na nuvem, isso deve ser o IP do banco
-        db_port = os.environ.get('DB_PORT', '3306')
-        db_name = os.environ.get('DB_NAME', 'mineiro')
+        df = pd.DataFrame(dados_lista)
 
-        # Conexão SQLAlchemy
-        connection_string = f"mysql+pymysql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
-        engine = create_engine(connection_string)
+        if not df.empty:
+            # --- CONFIGURAÇÃO DE BANCO VIA VARIÁVEIS DE AMBIENTE ---
+            db_user = os.environ.get('DB_USER', 'root')
+            db_pass = os.environ.get('DB_PASS', '1234')
+            db_host = os.environ.get('DB_HOST', 'localhost')
+            db_port = os.environ.get('DB_PORT', '3306')
+            db_name = os.environ.get('DB_NAME', 'mineiro')
 
-        print("Conectando ao banco de dados...")
+            connection_string = f"mysql+pymysql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+            engine = create_engine(connection_string)
 
-        # 1. Enviar para tabela staged
-        df.to_sql('staged_resultados', con=engine, if_exists='replace', index=False)
+            print("Atualizando banco de dados...")
 
-        # 2. Query de Insert/Update
-        query = text("""
-                     INSERT INTO resultados_jogos (
-                         match_id, time_casa, gols_casa, time_fora, gols_fora
-                     )
-                     SELECT
-                         match_id, time_casa, gols_casa, time_fora, gols_fora
-                     FROM staged_resultados
-                         ON DUPLICATE KEY UPDATE
-                                              gols_casa = VALUES(gols_casa),
-                                              gols_fora = VALUES(gols_fora),
-                                              data_extracao = CURRENT_TIMESTAMP;
-                     """)
+            df.to_sql('staged_resultados', con=engine, if_exists='replace', index=False)
 
-        with engine.begin() as conn:
-            conn.execute(query)
-            conn.execute(text("DROP TABLE staged_resultados;"))
+            query = text("""
+                         INSERT INTO resultados_jogos (
+                             match_id, time_casa, gols_casa, time_fora, gols_fora
+                         )
+                         SELECT
+                             match_id, time_casa, gols_casa, time_fora, gols_fora
+                         FROM staged_resultados
+                             ON DUPLICATE KEY UPDATE
+                                                  gols_casa = VALUES(gols_casa),
+                                                  gols_fora = VALUES(gols_fora),
+                                                  data_extracao = CURRENT_TIMESTAMP;
+                         """)
 
-        print(f"Sucesso! {len(df)} jogos processados.")
-    else:
-        print("Nenhum dado encontrado no scraping.")
+            with engine.begin() as conn:
+                conn.execute(query)
+                conn.execute(text("DROP TABLE staged_resultados;"))
 
-except Exception as e:
-    print(f"Erro fatal: {e}")
+            print(f"Sucesso! {len(df)} jogos processados e atualizados.")
+        else:
+            print("Nenhum dado encontrado no scraping.")
 
-finally:
-    driver.quit()
+    except Exception as e:
+        print(f"Erro no scraping: {e}")
+
+    finally:
+        driver.quit()
+        print("--- FIM DO SCRAPING ---")
+
+# Permite rodar o arquivo diretamente também: python webscraping-mineiro.py
+if __name__ == "__main__":
+    executar_atualizacao()

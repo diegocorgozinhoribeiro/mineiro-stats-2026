@@ -3,31 +3,27 @@ from flask import Flask, render_template, request, jsonify
 import json
 import itertools
 import copy
-# Adicionado login_required nos imports
 from flask_login import LoginManager, current_user, login_required
-# Importa o Blueprint e a função load_user do login.py
 from login import auth_bp, load_user as auth_load_user
 import os
 import gunicorn
+# Import necessário para carregar o arquivo com hífen no nome
+import importlib.util
+import sys
 
 app = Flask(__name__)
 app.secret_key = 'diego2810'
 app.register_blueprint(auth_bp)
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'auth.login' # Se tentar entrar na home sem logar, vai pra cá
+login_manager.login_view = 'auth.login'
 
-# --- CORREÇÃO IMPORTANTE ---
-# Usamos o auth_load_user do login.py para validar o usuário corretamente
 @login_manager.user_loader
 def loader(user_id):
     return auth_load_user(user_id)
 
-# ---------------------------
-
 app.secret_key = os.environ.get('SECRET_KEY', 'diego2810')
 
-# substituir DB_CONFIG fixo por leitura de variáveis de ambiente
 DB_CONFIG = {
     'host': os.environ.get('DB_HOST', 'localhost'),
     'port': int(os.environ.get('DB_PORT', 3306)),
@@ -36,21 +32,16 @@ DB_CONFIG = {
     'database': os.environ.get('DB_NAME', 'mineiro')
 }
 
-
-
 GRUPOS_FIXOS = {
     'A': ['URT', 'Democrata GV', 'Atlético MG', 'Uberlândia'],
     'B': ['América MG', 'Pouso Alegre', 'Betim', 'Tombense'],
     'C': ['North', 'Cruzeiro', 'Athletic', 'Itabirito']
 }
 
-# --- CACHE EM MEMÓRIA ---
-# Variável global para armazenar os dados e evitar consultas repetidas
 CACHE_APP = {
     'jogos': None,
     'logos': None
 }
-# ------------------------
 
 def get_db_connection():
     return mysql.connector.connect(**DB_CONFIG)
@@ -80,11 +71,6 @@ def buscar_dados_brutos():
     return jogos
 
 def obter_dados_memoria():
-    """
-    Retorna os dados dos jogos e logos.
-    Se já estiverem na memória (CACHE_APP), retorna de lá.
-    Caso contrário, busca no banco de dados e salva na memória.
-    """
     if CACHE_APP['jogos'] is None or CACHE_APP['logos'] is None:
         print("--- CARREGANDO DADOS DO BANCO PARA A MEMÓRIA (CACHE) ---")
         CACHE_APP['jogos'] = buscar_dados_brutos()
@@ -111,7 +97,6 @@ def processar_tabela_base(jogos, simulacoes_usuario=None, mapa_logos=None):
     for jogo in jogos:
         mid = str(jogo['match_id'])
         r = jogo['rodada']
-        # Copia o objeto para não alterar o cache original durante a simulação
         j = jogo.copy()
 
         tc_raw = j['time_casa'].strip()
@@ -271,14 +256,11 @@ def calcular_probabilidade_exata(tabela_base, jogos_abertos):
 @app.route('/')
 @login_required
 def index():
-    # USANDO O CACHE EM VEZ DE BUSCAR DO BANCO
     raw_games, logos = obter_dados_memoria()
-
     tabela_calc, rodadas_dict, jogos_abertos = processar_tabela_base(raw_games, {}, logos)
     classificacao_geral, grupos = ordenar_ranking_final(tabela_calc)
 
     probs = []
-
     r_atual = 1
     for r in sorted(rodadas_dict.keys()):
         if any(j['gols_casa'] is None for j in rodadas_dict[r]):
@@ -300,9 +282,6 @@ def api_atualizar():
     sims_user = data.get('simulacoes', {})
     calcular_agora = data.get('calcular_probabilidade', False)
 
-    # USANDO O CACHE EM VEZ DE BUSCAR DO BANCO
-    # Os cálculos (soma de pontos, gols) são feitos em memória pelo processar_tabela_base
-    # usando os dados crus (raw_games) + as simulações do usuário
     raw_games, logos = obter_dados_memoria()
 
     tabela_calc, _, jogos_abertos = processar_tabela_base(raw_games, sims_user, logos)
@@ -321,10 +300,29 @@ def api_atualizar():
 if __name__ == '__main__':
     host = os.environ.get('HOST', '0.0.0.0')
     port = int(os.environ.get('PORT', 8080))
-    print(port)
+    print(f"Servidor configurado na porta {port}")
     debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
-    # Pré-carregar na inicialização do servidor (opcional, mas recomendado)
+
     with app.app_context():
+        # --- CHAMADA AO SCRAPING NA INICIALIZAÇÃO ---
+        try:
+            # Importa dinamicamente pois o nome do arquivo tem hífen
+            file_name = 'webscraping-mineiro.py'
+            if os.path.exists(file_name):
+                print(f"Encontrado {file_name}. Preparando importação...")
+                spec = importlib.util.spec_from_file_location("webscraping_mineiro", file_name)
+                ws_module = importlib.util.module_from_spec(spec)
+                sys.modules["webscraping_mineiro"] = ws_module
+                spec.loader.exec_module(ws_module)
+
+                # Executa a função de atualização
+                ws_module.executar_atualizacao()
+            else:
+                print(f"Aviso: {file_name} não encontrado. O scraping não foi executado.")
+        except Exception as e:
+            print(f"Erro ao tentar executar o scraping na inicialização: {e}")
+        # --------------------------------------------
+
         try:
             obter_dados_memoria()
         except:
