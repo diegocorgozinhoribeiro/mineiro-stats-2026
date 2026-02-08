@@ -272,8 +272,8 @@
         <div>
             {% if user.is_authenticated %}
             <!-- Se estiver logado, mostra o nome e o botão de sair -->
-            <span class="me-3 text-white">Olá, {{ user.username }}</span>
-            <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-light btn-sm">Sair</a>
+            <span class="me-3 text-primary">Olá, {{ user.username }}</span>
+            <a href="{{ url_for('auth.logout') }}" class="btn btn-light btn-sm fw-bold text-primary">Sair</a>
             {% else %}
             <!-- Se NÃO estiver logado, mostra o botão de entrar -->
             <a href="{{ url_for('auth.login') }}" class="btn btn-light btn-sm fw-bold text-primary">
