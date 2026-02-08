@@ -76,7 +76,6 @@
 <div class="container d-flex justify-content-center">
   <div class="login-card">
     <div class="login-header">
-      <!-- Certifique-se de que a logo existe em static -->
       <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo FMF" class="login-logo">
       <h5 class="m-0 fw-bold">Acesso ao Sistema</h5>
       <small class="opacity-75">Simulador Módulo I</small>
@@ -118,11 +117,23 @@
         </div>
       </form>
     </div>
+
+    <!-- RODAPÉ ATUALIZADO -->
     <div class="bg-light p-3 text-center border-top">
-      <p class="mb-2 text-muted small">Ainda não tem uma conta?</p>
-      <a href="{{ url_for('auth.register') }}" class="btn btn-outline-secondary btn-sm fw-bold px-4 rounded-pill">
+
+      <!-- Seção de Cadastro -->
+      <p class="mb-1 text-muted small">Ainda não tem uma conta?</p>
+      <a href="{{ url_for('auth.register') }}" class="btn btn-outline-secondary btn-sm fw-bold px-4 rounded-pill mb-3">
         Criar conta agora
       </a>
+
+      <!-- Botão Voltar para Home -->
+      <div class="border-top pt-2">
+        <a href="{{ url_for('index') }}" class="btn btn-link text-decoration-none text-muted fw-bold small">
+          <i class="fas fa-home me-1"></i> Acessar sem login (Página Principal)
+        </a>
+      </div>
+
     </div>
   </div>
 </div>
