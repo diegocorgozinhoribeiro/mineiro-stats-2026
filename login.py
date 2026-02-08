@@ -3,7 +3,6 @@ from flask_login import login_user, logout_user, login_required, UserMixin, curr
 from werkzeug.security import check_password_hash, generate_password_hash
 import mysql.connector
 import os
-# Importando do novo arquivo centralizador
 from database import get_db_connection
 
 auth_bp = Blueprint('auth', __name__)
@@ -61,9 +60,14 @@ def register():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
 
-        if not username or not password:
+        if not username or not password or not confirm_password:
             flash('Preencha todos os campos.', 'warning')
+            return render_template('register.html')
+
+        if password != confirm_password:
+            flash('As senhas não conferem!', 'warning')
             return render_template('register.html')
 
         conn = get_db_connection()

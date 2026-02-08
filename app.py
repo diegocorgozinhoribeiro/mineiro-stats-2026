@@ -146,7 +146,7 @@ def calcular_probabilidade_exata(tabela_base, jogos_abertos):
     if qtd_jogos > LIMITE_PROCESSAMENTO: jogos_para_processar = jogos_abertos[:LIMITE_PROCESSAMENTO]
     else: jogos_para_processar = jogos_abertos
 
-    possibilidades = [(3, 0, 1, 0), (1, 1, 0, 0), (0, 3, 0, 1)]
+    possibilidades = [(3, 0, 5, 0), (1, 1, 0, 0), (0, 3, 0, 5)]
     todos_cenarios = itertools.product(possibilidades, repeat=len(jogos_para_processar))
     stats_counts = {time: {'semi': 0, 'inconf': 0, 'rebaix': 0} for time in tabela_base}
     total_cenarios = 0
