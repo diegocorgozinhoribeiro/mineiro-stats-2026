@@ -37,6 +37,7 @@ DB_CONFIG = {
 }
 
 
+
 GRUPOS_FIXOS = {
     'A': ['URT', 'Democrata GV', 'Atlético MG', 'Uberlândia'],
     'B': ['América MG', 'Pouso Alegre', 'Betim', 'Tombense'],
