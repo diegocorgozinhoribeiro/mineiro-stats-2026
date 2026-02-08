@@ -7,6 +7,11 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
+# Tenta importar ChromeType de diferentes locais para compatibilidade de versões
+try:
+    from webdriver_manager.core.os_manager import ChromeType
+except ImportError:
+    from webdriver_manager.utils import ChromeType
 
 def executar_atualizacao():
     print("--- INICIANDO PROCESSO DE SCRAPING AUTOMÁTICO ---")
@@ -19,9 +24,20 @@ def executar_atualizacao():
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
 
-    # Tenta instalar o driver automaticamente
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=options)
+    # Define explicitamente o caminho do binário encontrado no erro do servidor
+    options.binary_location = "/usr/bin/chromium"
+
+    try:
+        print("Instalando driver para Chromium...")
+        # Configura o gerenciador para baixar o driver compatível com CHROMIUM
+        manager = ChromeDriverManager(chrome_type=ChromeType.CHROMIUM)
+        service = Service(manager.install())
+        driver = webdriver.Chrome(service=service, options=options)
+    except Exception as e:
+        print(f"Erro ao configurar driver via webdriver_manager: {e}")
+        print("Tentando inicialização direta (Selenium Manager)...")
+        # Fallback: Tenta deixar o Selenium 4.6+ resolver sozinho
+        driver = webdriver.Chrome(options=options)
 
     url = "https://optaplayerstats.statsperform.com/en_GB/soccer/mineiro-1-2026/5sgngcwblcoi5lqglrkr3q42c/opta-player-stats"
 
@@ -99,7 +115,10 @@ def executar_atualizacao():
         print(f"Erro no scraping: {e}")
 
     finally:
-        driver.quit()
+        try:
+            driver.quit()
+        except:
+            pass
         print("--- FIM DO SCRAPING ---")
 
 # Permite rodar o arquivo diretamente também: python webscraping-mineiro.py
