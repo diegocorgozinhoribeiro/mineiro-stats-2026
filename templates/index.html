@@ -270,20 +270,14 @@
 
         <!-- Lado Direito: Botão de Logout -->
         <div>
-            {% if current_user.is_authenticated %}
-            <div class="d-flex align-items-center gap-3">
-                <span class="text-muted small fw-bold d-none d-md-inline">
-                    <i class="fas fa-user-circle me-1"></i> {{ current_user.id }}
-                </span>
-                <!-- Note o 'auth.logout' aqui -->
-                <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-danger btn-sm rounded-pill px-3 shadow-sm fw-bold">
-                    Sair <i class="fas fa-sign-out-alt ms-1"></i>
-                </a>
-            </div>
+            {% if user.is_authenticated %}
+            <!-- Se estiver logado, mostra o nome e o botão de sair -->
+            <span class="me-3 text-white">Olá, {{ user.username }}</span>
+            <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-light btn-sm">Sair</a>
             {% else %}
-            <!-- Note o 'auth.login' aqui -->
-            <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold">
-                Login
+            <!-- Se NÃO estiver logado, mostra o botão de entrar -->
+            <a href="{{ url_for('auth.login') }}" class="btn btn-light btn-sm fw-bold text-primary">
+                <i class="fas fa-user-circle"></i> Login / Cadastro
             </a>
             {% endif %}
         </div>
@@ -538,6 +532,8 @@
     <!-- Footer simples -->
     <footer class="text-center mt-5 text-muted small">
         <p>Módulo I - Minas Gerais &copy; 2025. Desenvolvido por Diego Ribeiro para torcedores.</p>
+        <p>Desenvolver: <a href="https://www.linkedin.com/in/diego-cribeiro/">Diego Ribeiro</a></p>
+
     </footer>
 </div>
 

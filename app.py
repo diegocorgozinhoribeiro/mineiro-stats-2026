@@ -8,7 +8,6 @@ from login import auth_bp, load_user as auth_load_user
 import os
 import importlib.util
 import sys
-# Importando do novo arquivo centralizador
 from database import get_db_connection
 
 app = Flask(__name__)
@@ -17,6 +16,7 @@ app.register_blueprint(auth_bp)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
+# Define para onde vai caso o usuário tente acessar algo restrito (se houver no futuro)
 login_manager.login_view = 'auth.login'
 
 @login_manager.user_loader
@@ -204,8 +204,9 @@ def calcular_probabilidade_exata(tabela_base, jogos_abertos):
             })
     return resultado_final
 
+# --- AQUI ESTAVA A MUDANÇA PRINCIPAL ---
+# Removido @login_required para permitir acesso público
 @app.route('/')
-@login_required
 def index():
     raw_games, logos = obter_dados_memoria()
     tabela_calc, rodadas_dict, _ = processar_tabela_base(raw_games, {}, logos)
@@ -215,11 +216,13 @@ def index():
         if any(j['gols_casa'] is None for j in rodadas_dict[r]):
             r_atual = r
             break
+
+    # Observe que passamos current_user. Mesmo se não logado, ele funciona (como Anônimo)
     return render_template('index.html', grupos=grupos, classificacao_geral=classificacao_geral,
                            rodadas=rodadas_dict, rodada_atual_num=r_atual, probabilidades=[], user=current_user)
 
+# Removido @login_required para permitir que qualquer um simule
 @app.route('/api/atualizar_tabela', methods=['POST'])
-@login_required
 def api_atualizar():
     data = request.json
     sims = data.get('simulacoes', {})
